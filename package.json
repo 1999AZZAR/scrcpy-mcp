@@ -1,0 +1,64 @@
+{
+  "name": "scrcpy-mcp",
+  "version": "0.4.0",
+  "mcpName": "io.github.JuanCF/scrcpy-mcp",
+  "description": "MCP server for Android device control via ADB and scrcpy — gives AI agents vision and control over Android devices",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "android",
+    "adb",
+    "scrcpy",
+    "model-context-protocol",
+    "ai",
+    "automation",
+    "mobile",
+    "screen-control"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JuanCF/scrcpy-mcp.git"
+  },
+  "author": "Juan C. Flores",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "scrcpy-mcp": "dist/server.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/server.js",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/server.js",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22",
+    "eslint": "^10.0.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^4.3.6"
+  },
+  "optionalDependencies": {
+    "ffmpeg-static": "^5.3.0"
+  }
+}

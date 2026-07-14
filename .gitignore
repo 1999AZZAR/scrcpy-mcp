@@ -1,0 +1,32 @@
+*
+!/.gitignore
+!/.npmrc
+!/.nvmrc
+!/classes.dex
+!/eslint.config.js
+!/package.json
+!/package-lock.json
+!/tsconfig.json
+!/tsup.config.ts
+!/vitest.config.ts
+!/vitest.integration.config.ts
+
+# Allow Source and Tests
+!/skill/
+!/skill/**
+!/src/
+!/src/**
+!/tests/
+!/tests/**
+
+# Allow Standard Documentation
+!/README.md
+!/LICENSE
+!/CHANGELOG.md
+
+# Ignore OS and Editor generated files inside allowed directories
+**/.DS_Store
+**/Thumbs.db
+**/*.swp
+**/*.swo
+**/*~
