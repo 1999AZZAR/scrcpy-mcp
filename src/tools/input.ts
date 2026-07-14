@@ -11,7 +11,7 @@ import {
   serializeInjectScrollEvent,
 } from "../core/scrcpy.js"
 import { ACTION_DOWN, ACTION_UP, ACTION_MOVE } from "../core/constants.js"
-import { dumpUiXml } from "./ui.js"
+import { dumpUiXml, parseUiNodes } from "./ui.js"
 
 const KEYCODE_MAP: Record<string, number> = {
   HOME: 3,
@@ -232,24 +232,43 @@ async function findSubmitButton(serial: string): Promise<{ x: number; y: number 
   return null
 }
 
+const INPUT_KEYWORDS = ["ask", "type", "search", "reply", "chat", "message", "text", "write", "enter", "input"]
+
 async function findAndFocusInput(serial: string): Promise<boolean> {
-  const raw = await dumpUiXml(serial)
-  // Look for an editable text field
-  const editTextMatch = raw.match(/class="[^"]*EditText[^"]*"\s[^>]*focused="false"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
-  if (editTextMatch) {
-    const x = Math.round((parseInt(editTextMatch[1]) + parseInt(editTextMatch[3])) / 2)
-    const y = Math.round((parseInt(editTextMatch[2]) + parseInt(editTextMatch[4])) / 2)
-    await execAdbShell(serial, `input tap ${x} ${y}`)
+  const xml = await dumpUiXml(serial)
+  const allElements = parseUiNodes(xml)
+
+  // Priority 1: EditText that is clickable (most standard input)
+  const editTexts = allElements.filter(e =>
+    e.className.endsWith("EditText") && e.clickable
+  ).sort((a, b) => b.tapY - a.tapY) // prefer bottom (chat inputs)
+  if (editTexts.length > 0) {
+    const target = editTexts[0]
+    await execAdbShell(serial, `input tap ${target.tapX} ${target.tapY}`)
     return true
   }
-  // Fallback: any clickable element with a hint/desc that looks like an input
-  const genericMatch = raw.match(/class="[^"]*(?:EditText|TextView)[^"]*"\s[^>]*clickable="true"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
-  if (genericMatch) {
-    const x = Math.round((parseInt(genericMatch[1]) + parseInt(genericMatch[3])) / 2)
-    const y = Math.round((parseInt(genericMatch[2]) + parseInt(genericMatch[4])) / 2)
-    await execAdbShell(serial, `input tap ${x} ${y}`)
+
+  // Priority 2: View with input-like content-desc (ChatGPT "Ask ChatGPT", "Reply to ChatGPT")
+  const inputDesc = allElements.filter(e => {
+    const desc = (e.contentDesc + " " + e.text).toLowerCase()
+    return INPUT_KEYWORDS.some(k => desc.includes(k))
+  }).sort((a, b) => b.tapY - a.tapY)
+  if (inputDesc.length > 0) {
+    const target = inputDesc[0]
+    await execAdbShell(serial, `input tap ${target.tapX} ${target.tapY}`)
     return true
   }
+
+  // Priority 3: Any clickable View in the bottom 25% of screen (chat areas)
+  const bottomClickable = allElements.filter(e =>
+    e.clickable && e.tapY > 0 && e.tapX > 0
+  ).sort((a, b) => b.tapY - a.tapY)
+  if (bottomClickable.length > 0) {
+    const target = bottomClickable[0]
+    await execAdbShell(serial, `input tap ${target.tapX} ${target.tapY}`)
+    return true
+  }
+
   return false
 }
 
@@ -460,7 +479,7 @@ export function registerInputTools(server: McpServer): void {
   server.registerTool(
     "input_text",
     {
-      description: "Type text into the input field. When submit=true, auto-detects the send button and taps it (for chat apps). Auto-focuses an editable field if none focused.",
+      description: "Type text into the input field. Reports device context (screen, app, session) so the caller knows what state the phone is in. When submit=true, auto-detects and taps the send button. Auto-focuses an editable field if none focused. Wakes the screen if off.",
       inputSchema: {
         text: z.string().describe("Text to type"),
         submit: z.boolean().optional().default(false).describe("Auto-tap send/submit button after typing (for chat/messaging apps)"),
@@ -468,7 +487,10 @@ export function registerInputTools(server: McpServer): void {
       },
       outputSchema: {
         ...actionOutputSchema,
+        screenOn: z.boolean().describe("Whether the screen was on before this action"),
+        currentApp: z.string().describe("Package name of the foreground app"),
         focused: z.boolean().optional().describe("Whether an input field was auto-focused"),
+        sessionActive: z.boolean().describe("Whether scrcpy session was active"),
         submitUsed: z.boolean().optional().describe("Whether a submit button was tapped after typing"),
       },
       annotations: {
@@ -484,7 +506,25 @@ export function registerInputTools(server: McpServer): void {
         const s = await resolveSerial(serial)
         const result: Record<string, unknown> = { success: true, message: "" }
 
-        // Auto-focus an editable field if nothing is focused
+        // Device context — capture initial state
+        const [powerRaw, appRaw] = await Promise.all([
+          execAdbShell(s, "dumpsys power | grep 'mWakefulness='"),
+          execAdbShell(s, "dumpsys window | grep mCurrentFocus"),
+        ])
+        const screenOn = powerRaw.includes("Awake") || powerRaw.includes("Dozing")
+        result.screenOn = screenOn
+        result.sessionActive = hasActiveSession(s)
+
+        const appMatch = appRaw.match(/mCurrentFocus=Window\{[^}]+\s+([^/}]+)/)
+        result.currentApp = appMatch?.[1] || "unknown"
+
+        // Wake screen if off
+        if (!screenOn) {
+          await execAdbShell(s, "input keyevent KEYCODE_WAKEUP")
+          await new Promise(res => setTimeout(res, 500))
+        }
+
+        // Auto-focus an editable field
         const focused = await findAndFocusInput(s)
         result.focused = focused
         await new Promise(res => setTimeout(res, 300))
@@ -519,12 +559,13 @@ export function registerInputTools(server: McpServer): void {
         }
 
         const parts = [`Typed: "${text}"`]
+        if (!result.screenOn) parts.push("(woke screen)")
         if (result.focused) parts.push("(auto-focused)")
         if (submit) parts.push(result.submitUsed ? "✓ sent" : "✗ no send button")
         result.message = parts.join(" ")
         return {
           content: [{ type: "text" as const, text: result.message }],
-          structuredContent: result as { success: boolean; message: string; focused?: boolean; submitUsed?: boolean },
+          structuredContent: result as { success: boolean; message: string; screenOn: boolean; currentApp: string; sessionActive: boolean; focused?: boolean; submitUsed?: boolean },
         }
       } catch (error) {
         const err = error as Error
