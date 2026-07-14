@@ -11,7 +11,7 @@ import {
   serializeInjectScrollEvent,
 } from "../core/scrcpy.js"
 import { ACTION_DOWN, ACTION_UP, ACTION_MOVE } from "../core/constants.js"
-import { dumpUiXml, parseUiNodes } from "./ui.js"
+import { dumpUiXml, parseUiNodes, filterElements, findNearestInput } from "./ui.js"
 
 const KEYCODE_MAP: Record<string, number> = {
   HOME: 3,
@@ -479,10 +479,13 @@ export function registerInputTools(server: McpServer): void {
   server.registerTool(
     "input_text",
     {
-      description: "Type text into the input field. Reports device context (screen, app, session) so the caller knows what state the phone is in. When submit=true, auto-detects and taps the send button. Auto-focuses an editable field if none focused. Wakes the screen if off.",
+      description: "Type text into the input field. Reports device context (screen, app, session). When submit=true, auto-detects and taps the send button. Optionally target a specific input field by text label, resource ID, or content description instead of auto-focus.",
       inputSchema: {
         text: z.string().describe("Text to type"),
         submit: z.boolean().optional().default(false).describe("Auto-tap send/submit button after typing (for chat/messaging apps)"),
+        elementText: z.string().optional().describe("Target a specific input by its label text (e.g. 'Full Name', 'City/Domicile')"),
+        elementId: z.string().optional().describe("Target a specific input by resource ID"),
+        elementContentDesc: z.string().optional().describe("Target a specific input by content description"),
         serial: z.string().optional().describe("Device serial number"),
       },
       outputSchema: {
@@ -501,7 +504,7 @@ export function registerInputTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ text, submit, serial }) => {
+    async ({ text, submit, elementText, elementId, elementContentDesc, serial }) => {
       try {
         const s = await resolveSerial(serial)
         const result: Record<string, unknown> = { success: true, message: "" }
@@ -524,8 +527,40 @@ export function registerInputTools(server: McpServer): void {
           await new Promise(res => setTimeout(res, 500))
         }
 
-        // Auto-focus an editable field
-        const focused = await findAndFocusInput(s)
+        // Explicit element targeting
+        let focused = false
+        if (elementText || elementId || elementContentDesc) {
+          const xml = await dumpUiXml(s)
+          const allElements = parseUiNodes(xml)
+
+          const opts: { text?: string; resourceId?: string; contentDesc?: string } = {}
+          if (elementText) opts.text = elementText
+          if (elementId) opts.resourceId = elementId
+          if (elementContentDesc) opts.contentDesc = elementContentDesc
+
+          const labelResults = filterElements(allElements, opts)
+          if (labelResults.length > 0) {
+            const label = labelResults[0]
+            const nearest = findNearestInput(allElements, label.tapX, label.tapY)
+            if (nearest) {
+              if (hasActiveSession(s)) {
+                try {
+                  await tapViaScrcpy(s, nearest.tapX, nearest.tapY)
+                } catch {
+                  await execAdbShell(s, `input tap ${nearest.tapX} ${nearest.tapY}`)
+                }
+              } else {
+                await execAdbShell(s, `input tap ${nearest.tapX} ${nearest.tapY}`)
+              }
+              focused = true
+            }
+          }
+          if (!focused) {
+            focused = await findAndFocusInput(s)
+          }
+        } else {
+          focused = await findAndFocusInput(s)
+        }
         result.focused = focused
         await new Promise(res => setTimeout(res, 300))
 
@@ -560,12 +595,14 @@ export function registerInputTools(server: McpServer): void {
 
         const parts = [`Typed: "${text}"`]
         if (!result.screenOn) parts.push("(woke screen)")
-        if (result.focused) parts.push("(auto-focused)")
+        if (elementText) parts.push(`(targeted: "${elementText}")`)
+        else if (elementId) parts.push(`(targeted: #${elementId})`)
+        else if (result.focused) parts.push("(auto-focused)")
         if (submit) parts.push(result.submitUsed ? "✓ sent" : "✗ no send button")
         result.message = parts.join(" ")
         return {
-          content: [{ type: "text" as const, text: result.message }],
-          structuredContent: result as { success: boolean; message: string; screenOn: boolean; currentApp: string; sessionActive: boolean; focused?: boolean; submitUsed?: boolean },
+          content: [{ type: "text" as const, text: result.message as string }],
+          structuredContent: result,
         }
       } catch (error) {
         const err = error as Error
@@ -632,12 +669,12 @@ export function registerInputTools(server: McpServer): void {
   server.registerTool(
     "scroll",
     {
-      description: "Scroll at the specified position. dx and dy are scroll amounts (-1 to 1 range approximated for ADB).",
+      description: "Scroll at the specified position. dy=negative scrolls UP (reveals content above), dy=positive scrolls DOWN (reveals content below). Use large values (e.g. -400, 500) for meaningful scroll distance.",
       inputSchema: {
         x: z.number().int().nonnegative().describe("X coordinate to scroll at"),
         y: z.number().int().nonnegative().describe("Y coordinate to scroll at"),
         dx: z.number().describe("Horizontal scroll amount (negative=left, positive=right)"),
-        dy: z.number().describe("Vertical scroll amount (negative=up, positive=down)"),
+        dy: z.number().describe("Vertical scroll: negative=scroll UP (reveal above), positive=scroll DOWN (reveal below)"),
         serial: z.string().optional().describe("Device serial number"),
       },
       outputSchema: actionOutputSchema,
@@ -664,10 +701,10 @@ export function registerInputTools(server: McpServer): void {
         }
 
         const duration = 300
-        const distance = 100
+        const distance = 3
 
         const endX = Math.max(0, Math.round(x + dx * distance))
-        const endY = Math.max(0, Math.round(y + dy * distance))
+        const endY = Math.max(0, Math.round(y - dy * distance))
 
         await execAdbShell(s, `input swipe ${x} ${y} ${endX} ${endY} ${duration}`)
         return actionOk(`Scrolled at (${x}, ${y}) with delta (${dx}, ${dy})`)
