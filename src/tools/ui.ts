@@ -343,7 +343,7 @@ export function registerUiTools(server: McpServer): void {
         contentDesc: z.string().optional().describe("Content description to search for"),
         exactMatch: z.boolean().optional().default(false).describe("If true, text and contentDesc require exact matches"),
         serial: z.string().optional().describe("Device serial number"),
-        timeoutMs: z.number().int().optional().default(10000).describe("Maximum time to wait in milliseconds"),
+        timeoutMs: z.number().int().optional().default(15000).describe("Maximum time to wait in milliseconds (default 15000)"),
       },
       outputSchema: {
         success: z.boolean(),

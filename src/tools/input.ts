@@ -9,6 +9,7 @@ import {
   serializeInjectText,
   serializeInjectTouchEvent,
   serializeInjectScrollEvent,
+  startSession,
 } from "../core/scrcpy.js"
 import { ACTION_DOWN, ACTION_UP, ACTION_MOVE } from "../core/constants.js"
 import { dumpUiXml } from "./ui.js"
@@ -198,6 +199,7 @@ async function inputTextViaScrcpy(serial: string, text: string): Promise<void> {
 }
 
 const SUBMIT_DESCRIPTORS = ["send", "send message", "submit", "\u2192", "kirim"]
+const SUBMIT_RESOURCE_IDS = ["send", "send_button", "btn_send", "submit", "btn_submit", "iv_send"]
 
 async function findSubmitButton(serial: string): Promise<{ x: number; y: number } | null> {
   const raw = await dumpUiXml(serial)
@@ -207,17 +209,58 @@ async function findSubmitButton(serial: string): Promise<{ x: number; y: number 
   while ((match = nodeRegex.exec(raw)) !== null) {
     const attrs = match[1]
     const contentDesc = (attrs.match(/content-desc="([^"]*)"/)?.[1] || "").toLowerCase()
-    if (!SUBMIT_DESCRIPTORS.some(d => contentDesc.includes(d))) continue
-
+    const resourceId = (attrs.match(/resource-id="([^"]*)"/)?.[1] || "").toLowerCase()
+    const resourceIdShort = resourceId.split("/").pop() || ""
     const boundsMatch = attrs.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
     if (!boundsMatch) continue
 
-    return {
-      x: Math.round((parseInt(boundsMatch[1]) + parseInt(boundsMatch[3])) / 2),
-      y: Math.round((parseInt(boundsMatch[2]) + parseInt(boundsMatch[4])) / 2),
+    // Match by content-desc
+    if (SUBMIT_DESCRIPTORS.some(d => contentDesc.includes(d))) {
+      return {
+        x: Math.round((parseInt(boundsMatch[1]) + parseInt(boundsMatch[3])) / 2),
+        y: Math.round((parseInt(boundsMatch[2]) + parseInt(boundsMatch[4])) / 2),
+      }
+    }
+
+    // Match by resource-id
+    if (SUBMIT_RESOURCE_IDS.some(id => resourceIdShort.includes(id))) {
+      return {
+        x: Math.round((parseInt(boundsMatch[1]) + parseInt(boundsMatch[3])) / 2),
+        y: Math.round((parseInt(boundsMatch[2]) + parseInt(boundsMatch[4])) / 2),
+      }
     }
   }
   return null
+}
+
+async function ensureActiveSession(serial: string): Promise<string> {
+  const s = await resolveSerial(serial)
+  if (!hasActiveSession(s)) {
+    console.error(`[input] Auto-starting scrcpy session for ${s}`)
+    await startSession(s)
+  }
+  return s
+}
+
+async function findAndFocusInput(serial: string): Promise<boolean> {
+  const raw = await dumpUiXml(serial)
+  // Look for an editable text field
+  const editTextMatch = raw.match(/class="[^"]*EditText[^"]*"\s[^>]*focused="false"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
+  if (editTextMatch) {
+    const x = Math.round((parseInt(editTextMatch[1]) + parseInt(editTextMatch[3])) / 2)
+    const y = Math.round((parseInt(editTextMatch[2]) + parseInt(editTextMatch[4])) / 2)
+    await execAdbShell(serial, `input tap ${x} ${y}`)
+    return true
+  }
+  // Fallback: any clickable element with a hint/desc that looks like an input
+  const genericMatch = raw.match(/class="[^"]*(?:EditText|TextView)[^"]*"\s[^>]*clickable="true"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
+  if (genericMatch) {
+    const x = Math.round((parseInt(genericMatch[1]) + parseInt(genericMatch[3])) / 2)
+    const y = Math.round((parseInt(genericMatch[2]) + parseInt(genericMatch[4])) / 2)
+    await execAdbShell(serial, `input tap ${x} ${y}`)
+    return true
+  }
+  return false
 }
 
 // Shared output schema for input/gesture tools: a simple success + message result.
@@ -427,7 +470,7 @@ export function registerInputTools(server: McpServer): void {
   server.registerTool(
     "input_text",
     {
-      description: "Type text into the currently focused input field. When submit=true, auto-detects and taps the send/submit button after typing (use for chat apps like ChatGPT, WhatsApp, etc.).",
+      description: "Type text into the input field. When submit=true, auto-detects the send button and taps it (for chat apps). Auto-focuses an editable field if none focused. Auto-starts scrcpy session for low-latency input.",
       inputSchema: {
         text: z.string().describe("Text to type"),
         submit: z.boolean().optional().default(false).describe("Auto-tap send/submit button after typing (for chat/messaging apps)"),
@@ -435,7 +478,9 @@ export function registerInputTools(server: McpServer): void {
       },
       outputSchema: {
         ...actionOutputSchema,
-        submitUsed: z.boolean().optional().describe("Whether a submit button was tapped"),
+        focused: z.boolean().optional().describe("Whether an input field was auto-focused"),
+        sessionStarted: z.boolean().optional().describe("Whether a scrcpy session was auto-started"),
+        submitUsed: z.boolean().optional().describe("Whether a submit button was tapped after typing"),
       },
       annotations: {
         title: "Type Text",
@@ -447,14 +492,26 @@ export function registerInputTools(server: McpServer): void {
     },
     async ({ text, submit, serial }) => {
       try {
-        const s = await resolveSerial(serial)
+        let s = await resolveSerial(serial)
+        const result: Record<string, unknown> = { success: true, message: "" }
 
-        if (hasActiveSession(s)) {
+        // Auto-start scrcpy session for lower-latency input
+        const sessionWasInactive = !hasActiveSession(s)
+        if (sessionWasInactive) {
+          s = await ensureActiveSession(s)
+          result.sessionStarted = true
+        }
+
+        // Auto-focus an editable field if nothing is focused
+        const focused = await findAndFocusInput(s)
+        result.focused = focused
+        await new Promise(res => setTimeout(res, 300))
+
+        // Type the text
+        if (sessionWasInactive || hasActiveSession(s)) {
           try {
             await inputTextViaScrcpy(s, text)
-          } catch (error) {
-            const err = error as Error
-            console.error(`[input_text] scrcpy failed, falling back to ADB: ${err.message}`)
+          } catch {
             const escaped = escapeTextForShell(text)
             await execAdbShell(s, `input text "${escaped}"`)
           }
@@ -463,6 +520,7 @@ export function registerInputTools(server: McpServer): void {
           await execAdbShell(s, `input text "${escaped}"`)
         }
 
+        // Submit detection
         if (submit) {
           await new Promise(res => setTimeout(res, 500))
           const btn = await findSubmitButton(s)
@@ -472,18 +530,21 @@ export function registerInputTools(server: McpServer): void {
             } else {
               await execAdbShell(s, `input tap ${btn.x} ${btn.y}`)
             }
-            return {
-              ...actionOk(`Typed: "${text}"`),
-              structuredContent: { success: true, message: `Typed: "${text}"`, submitUsed: true },
-            }
-          }
-          return {
-            ...actionOk(`Typed: "${text}" (no submit button found)`),
-            structuredContent: { success: true, message: `Typed: "${text}" (no submit button found)`, submitUsed: false },
+            result.submitUsed = true
+          } else {
+            result.submitUsed = false
           }
         }
 
-        return actionOk(`Typed: "${text}"`)
+        const parts = [`Typed: "${text}"`]
+        if (result.sessionStarted) parts.push("(session auto-started)")
+        if (result.focused) parts.push("(auto-focused)")
+        if (submit) parts.push(result.submitUsed ? "✓ sent" : "✗ no send button")
+        result.message = parts.join(" ")
+        return {
+          content: [{ type: "text" as const, text: result.message }],
+          structuredContent: result as { success: boolean; message: string; focused?: boolean; sessionStarted?: boolean; submitUsed?: boolean },
+        }
       } catch (error) {
         const err = error as Error
         return actionError(err.message)
