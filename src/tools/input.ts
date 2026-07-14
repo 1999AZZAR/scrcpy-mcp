@@ -11,7 +11,7 @@ import {
   serializeInjectScrollEvent,
 } from "../core/scrcpy.js"
 import { ACTION_DOWN, ACTION_UP, ACTION_MOVE } from "../core/constants.js"
-import { parseUiNodes } from "./ui.js"
+import { dumpUiXml } from "./ui.js"
 
 const KEYCODE_MAP: Record<string, number> = {
   HOME: 3,
@@ -200,11 +200,7 @@ async function inputTextViaScrcpy(serial: string, text: string): Promise<void> {
 const SUBMIT_DESCRIPTORS = ["send", "send message", "submit", "\u2192", "kirim"]
 
 async function findSubmitButton(serial: string): Promise<{ x: number; y: number } | null> {
-  const tmpPath = `/sdcard/.submit_${Date.now()}_${Math.random().toString(36).slice(2)}.xml`
-  const raw = await execAdbShell(
-    serial,
-    `uiautomator dump --compressed ${tmpPath} 2>/dev/null; cat ${tmpPath}; rm -f ${tmpPath}`
-  ).then(r => r.replace(/UI hier[^\n]*dumped to:[^\n]*/gi, "").trim())
+  const raw = await dumpUiXml(serial)
   const nodeRegex = /<node\s([^>]+?)(?:\/>|>)/gs
   let match: RegExpExecArray | null
 
