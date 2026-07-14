@@ -200,9 +200,11 @@ async function inputTextViaScrcpy(serial: string, text: string): Promise<void> {
 const SUBMIT_DESCRIPTORS = ["send", "send message", "submit", "\u2192", "kirim"]
 
 async function findSubmitButton(serial: string): Promise<{ x: number; y: number } | null> {
-  const raw = await execAdbShell(serial, `uiautomator dump /dev/stderr 2>/dev/null`)
-  // Parse the XML inline to find a submit button
-  const descRegex = /content-desc="([^"]*?)"/gi
+  const tmpPath = `/sdcard/.submit_${Date.now()}_${Math.random().toString(36).slice(2)}.xml`
+  const raw = await execAdbShell(
+    serial,
+    `uiautomator dump --compressed ${tmpPath} 2>/dev/null; cat ${tmpPath}; rm -f ${tmpPath}`
+  )
   const nodeRegex = /<node\s([^>]+?)(?:\/>|>)/gs
   let match: RegExpExecArray | null
 
