@@ -204,7 +204,7 @@ async function findSubmitButton(serial: string): Promise<{ x: number; y: number 
   const raw = await execAdbShell(
     serial,
     `uiautomator dump --compressed ${tmpPath} 2>/dev/null; cat ${tmpPath}; rm -f ${tmpPath}`
-  )
+  ).then(r => r.replace(/UI hier[^\n]*dumped to:[^\n]*/gi, "").trim())
   const nodeRegex = /<node\s([^>]+?)(?:\/>|>)/gs
   let match: RegExpExecArray | null
 
