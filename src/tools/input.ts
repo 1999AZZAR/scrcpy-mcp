@@ -489,16 +489,29 @@ export function registerInputTools(server: McpServer): void {
         result.focused = focused
         await new Promise(res => setTimeout(res, 300))
 
-        // Type the text (ADB path — more stable than scrcpy)
-        const escaped = escapeTextForShell(text)
-        await execAdbShell(s, `input text "${escaped}"`)
+        // Type the text — scrcpy first (fast), fallback to ADB (stable)
+        if (hasActiveSession(s)) {
+          try {
+            await inputTextViaScrcpy(s, text)
+          } catch {
+            const escaped = escapeTextForShell(text)
+            await execAdbShell(s, `input text "${escaped}"`)
+          }
+        } else {
+          const escaped = escapeTextForShell(text)
+          await execAdbShell(s, `input text "${escaped}"`)
+        }
 
         // Submit detection
         if (submit) {
           await new Promise(res => setTimeout(res, 500))
           const btn = await findSubmitButton(s)
           if (btn) {
-            await execAdbShell(s, `input tap ${btn.x} ${btn.y}`)
+            if (hasActiveSession(s)) {
+              await tapViaScrcpy(s, btn.x, btn.y)
+            } else {
+              await execAdbShell(s, `input tap ${btn.x} ${btn.y}`)
+            }
             result.submitUsed = true
           } else {
             result.submitUsed = false
