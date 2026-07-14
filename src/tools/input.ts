@@ -9,7 +9,6 @@ import {
   serializeInjectText,
   serializeInjectTouchEvent,
   serializeInjectScrollEvent,
-  startSession,
 } from "../core/scrcpy.js"
 import { ACTION_DOWN, ACTION_UP, ACTION_MOVE } from "../core/constants.js"
 import { dumpUiXml } from "./ui.js"
@@ -231,15 +230,6 @@ async function findSubmitButton(serial: string): Promise<{ x: number; y: number 
     }
   }
   return null
-}
-
-async function ensureActiveSession(serial: string): Promise<string> {
-  const s = await resolveSerial(serial)
-  if (!hasActiveSession(s)) {
-    console.error(`[input] Auto-starting scrcpy session for ${s}`)
-    await startSession(s)
-  }
-  return s
 }
 
 async function findAndFocusInput(serial: string): Promise<boolean> {
@@ -470,7 +460,7 @@ export function registerInputTools(server: McpServer): void {
   server.registerTool(
     "input_text",
     {
-      description: "Type text into the input field. When submit=true, auto-detects the send button and taps it (for chat apps). Auto-focuses an editable field if none focused. Auto-starts scrcpy session for low-latency input.",
+      description: "Type text into the input field. When submit=true, auto-detects the send button and taps it (for chat apps). Auto-focuses an editable field if none focused.",
       inputSchema: {
         text: z.string().describe("Text to type"),
         submit: z.boolean().optional().default(false).describe("Auto-tap send/submit button after typing (for chat/messaging apps)"),
@@ -479,7 +469,6 @@ export function registerInputTools(server: McpServer): void {
       outputSchema: {
         ...actionOutputSchema,
         focused: z.boolean().optional().describe("Whether an input field was auto-focused"),
-        sessionStarted: z.boolean().optional().describe("Whether a scrcpy session was auto-started"),
         submitUsed: z.boolean().optional().describe("Whether a submit button was tapped after typing"),
       },
       annotations: {
@@ -492,44 +481,24 @@ export function registerInputTools(server: McpServer): void {
     },
     async ({ text, submit, serial }) => {
       try {
-        let s = await resolveSerial(serial)
+        const s = await resolveSerial(serial)
         const result: Record<string, unknown> = { success: true, message: "" }
-
-        // Auto-start scrcpy session for lower-latency input
-        const sessionWasInactive = !hasActiveSession(s)
-        if (sessionWasInactive) {
-          s = await ensureActiveSession(s)
-          result.sessionStarted = true
-        }
 
         // Auto-focus an editable field if nothing is focused
         const focused = await findAndFocusInput(s)
         result.focused = focused
         await new Promise(res => setTimeout(res, 300))
 
-        // Type the text
-        if (sessionWasInactive || hasActiveSession(s)) {
-          try {
-            await inputTextViaScrcpy(s, text)
-          } catch {
-            const escaped = escapeTextForShell(text)
-            await execAdbShell(s, `input text "${escaped}"`)
-          }
-        } else {
-          const escaped = escapeTextForShell(text)
-          await execAdbShell(s, `input text "${escaped}"`)
-        }
+        // Type the text (ADB path — more stable than scrcpy)
+        const escaped = escapeTextForShell(text)
+        await execAdbShell(s, `input text "${escaped}"`)
 
         // Submit detection
         if (submit) {
           await new Promise(res => setTimeout(res, 500))
           const btn = await findSubmitButton(s)
           if (btn) {
-            if (hasActiveSession(s)) {
-              await tapViaScrcpy(s, btn.x, btn.y)
-            } else {
-              await execAdbShell(s, `input tap ${btn.x} ${btn.y}`)
-            }
+            await execAdbShell(s, `input tap ${btn.x} ${btn.y}`)
             result.submitUsed = true
           } else {
             result.submitUsed = false
@@ -537,13 +506,12 @@ export function registerInputTools(server: McpServer): void {
         }
 
         const parts = [`Typed: "${text}"`]
-        if (result.sessionStarted) parts.push("(session auto-started)")
         if (result.focused) parts.push("(auto-focused)")
         if (submit) parts.push(result.submitUsed ? "✓ sent" : "✗ no send button")
         result.message = parts.join(" ")
         return {
           content: [{ type: "text" as const, text: result.message }],
-          structuredContent: result as { success: boolean; message: string; focused?: boolean; sessionStarted?: boolean; submitUsed?: boolean },
+          structuredContent: result as { success: boolean; message: string; focused?: boolean; submitUsed?: boolean },
         }
       } catch (error) {
         const err = error as Error
