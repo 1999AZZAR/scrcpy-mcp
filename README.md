@@ -2,6 +2,8 @@
 
 MCP server for Android device control via ADB and scrcpy. Gives AI agents vision and control over Android devices.
 
+![Blotcat acting as a puppeteer, controlling an Android phone with strings](assets/scrcpy-illustrations/01-hero.jpg)
+
 ## Requirements
 
 - **Node.js** >= 22
@@ -82,6 +84,8 @@ Add to your MCP client config:
 
 ### Input
 
+![Blotcat moving at lightning speed leaving afterimages while tapping an Android phone](assets/scrcpy-illustrations/02-fast-input.jpg)
+
 Coordinate tools accept native display coordinates matching `ui_dump` bounds.
 
 | Tool | Action |
@@ -113,6 +117,8 @@ Coordinate tools accept native display coordinates matching `ui_dump` bounds.
 | `clipboard_set` | Set clipboard text. Optional `paste` flag with scrcpy session. |
 
 ### UI
+
+![Blotcat using a magnifying glass to inspect an Android phone broken down into wireframe building blocks](assets/scrcpy-illustrations/03-ui-dump.jpg)
 
 All UI tools use `uiautomator dump --compressed` under the hood.
 
