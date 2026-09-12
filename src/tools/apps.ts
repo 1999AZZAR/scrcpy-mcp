@@ -1,6 +1,7 @@
 import * as path from "path"
 import * as fs from "fs"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import { execAdb, execAdbShell, resolveSerial } from "../core/adb.js"
 import { hasActiveSession, startAppViaScrcpy } from "../core/scrcpy.js"
@@ -29,7 +30,7 @@ function toolError(message: string) {
 }
 
 export function registerAppTools(server: McpServer): void {
-  server.registerTool(
+  registerEnvTool(server, 
     "app_start",
     {
       description: "Launch an app by package name. PREFERRED over swiping the app drawer / manual UI navigation. Uses scrcpy START_APP (fast) when session is active, falls back to ADB `am start`. Supports force-stop prefix (+).",
@@ -123,7 +124,7 @@ export function registerAppTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "app_stop",
     {
       description: "Force-stop an app on the device.",
@@ -158,7 +159,7 @@ export function registerAppTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "app_install",
     {
       description: "Install an APK file on the device from the host machine.",
@@ -204,7 +205,7 @@ export function registerAppTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "app_uninstall",
     {
       description: "Uninstall an app from the device.",
@@ -244,7 +245,7 @@ export function registerAppTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "app_list",
     {
       description: "List installed packages on the device. Optionally filter by name or restrict to system/third-party apps. Use to find package names for app_start.",
@@ -289,7 +290,7 @@ export function registerAppTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "app_current",
     {
       description: "Get the currently foregrounded app package name and activity.",

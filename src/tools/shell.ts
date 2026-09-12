@@ -1,9 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import { execAdbShell, resolveSerial } from "../core/adb.js"
 
 export function registerShellTools(server: McpServer): void {
-  server.registerTool(
+  registerEnvTool(server, 
     "shell_exec",
     {
       description:
@@ -25,6 +26,17 @@ export function registerShellTools(server: McpServer): void {
       },
     },
     async ({ command, serial }) => {
+      // P0-A3: arbitrary on-device shell is gated. Solo operators opt in with
+      // HELA_RECEPTOR_ALLOW_SHELL=true; all other receptor tools are unaffected.
+      if (process.env['HELA_RECEPTOR_ALLOW_SHELL'] !== 'true') {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ error: true, message: "shell_exec is disabled (set HELA_RECEPTOR_ALLOW_SHELL=true to enable)" }),
+          }],
+          isError: true as const,
+        };
+      }
       try {
         const s = await resolveSerial(serial)
         const output = await execAdbShell(s, command)

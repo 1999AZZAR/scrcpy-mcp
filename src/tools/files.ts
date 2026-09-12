@@ -1,6 +1,7 @@
 import * as nodePath from "path"
 import * as fs from "fs"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import { execAdb, execAdbShell, resolveSerial } from "../core/adb.js"
 
@@ -45,7 +46,7 @@ export function parseLsOutput(output: string): FileEntry[] {
 }
 
 export function registerFileTools(server: McpServer): void {
-  server.registerTool(
+  registerEnvTool(server, 
     "file_push",
     {
       description: "Push a file from the host machine to the device.",
@@ -107,7 +108,7 @@ export function registerFileTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "file_pull",
     {
       description: "Pull a file from the device to the host machine.",
@@ -160,7 +161,7 @@ export function registerFileTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "file_list",
     {
       description: "List directory contents on the device.",

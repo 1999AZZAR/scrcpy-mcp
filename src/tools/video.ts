@@ -1,11 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import { resolveSerial } from "../core/adb.js"
 import { hasActiveSession, getSession, startSession } from "../core/scrcpy.js"
 import { startMjpegServer, startStreamViewer, stopMjpegServer, isMjpegServerRunning } from "../core/mjpeg.js"
 
 export function registerVideoTools(server: McpServer): void {
-  server.registerTool(
+  registerEnvTool(server, 
     "start_video_stream",
     {
       description: "Start an HTTP MJPEG video stream of the device screen and open a viewer window (ffplay). Starts a scrcpy session automatically if needed.",
@@ -67,7 +68,7 @@ export function registerVideoTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "stop_video_stream",
     {
       description: "Stop the HTTP MJPEG video stream and close the viewer window for a device.",

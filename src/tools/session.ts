@@ -1,11 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import { resolveSerial } from "../core/adb.js"
 import { startSession, stopSession, detectScrcpyVersionInfo } from "../core/scrcpy.js"
 import { stopMjpegServer } from "../core/mjpeg.js"
 
 export function registerSessionTools(server: McpServer): void {
-  server.registerTool(
+  registerEnvTool(server, 
     "start_session",
     {
       description: "Start a scrcpy session for fast input control and screenshots. When a session is active, tap/swipe/text/screenshot are 10-50x faster. Requires scrcpy-server to be installed.",
@@ -65,7 +66,7 @@ export function registerSessionTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "stop_session",
     {
       description: "Stop the active scrcpy session. Tools will fall back to ADB commands.",
@@ -110,7 +111,7 @@ export function registerSessionTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "version",
     {
       description: "Report which scrcpy version is being used by the MCP server. The version is detected from the SCRCPY_SERVER_VERSION environment variable, the scrcpy --version binary, or a built-in default.",

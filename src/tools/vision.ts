@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from "child_process"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import { execAdb, execAdbRaw, resolveSerial } from "../core/adb.js"
 import { ADB_PATH } from "../core/constants.js"
@@ -13,7 +14,7 @@ interface RecordingSession {
 const recordingSessions: Map<string, RecordingSession> = new Map();
 
 export function registerVisionTools(server: McpServer) {
-  server.registerTool(
+  registerEnvTool(server, 
     "screenshot",
     {
       description: "Take a screenshot of the Android device screen. Returns the image as base64.",
@@ -66,7 +67,7 @@ export function registerVisionTools(server: McpServer) {
     }
   );
 
-  server.registerTool(
+  registerEnvTool(server, 
     "screen_record_start",
     {
       description: "Start recording the screen. Recording continues until screen_record_stop is called.",
@@ -149,7 +150,7 @@ export function registerVisionTools(server: McpServer) {
     }
   );
 
-  server.registerTool(
+  registerEnvTool(server, 
     "screen_record_stop",
     {
       description: "Stop screen recording and optionally pull the file to the host.",

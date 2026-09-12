@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import {
   getDevices,
@@ -56,7 +57,7 @@ function toolError(message: string, extra: Record<string, unknown> = {}) {
 }
 
 export function registerDeviceTools(server: McpServer) {
-  server.registerTool(
+  registerEnvTool(server, 
     "device_list",
     {
       description: "List all connected Android devices with their serial numbers, state, and model",
@@ -89,7 +90,7 @@ export function registerDeviceTools(server: McpServer) {
     }
   );
 
-  server.registerTool(
+  registerEnvTool(server, 
     "device_info",
     {
       description: "Get detailed info about a device: model, Android version, screen size, SDK level, battery level",
@@ -156,7 +157,7 @@ export function registerDeviceTools(server: McpServer) {
     }
   );
 
-  server.registerTool(
+  registerEnvTool(server, 
     "screen_on",
     {
       description: "Wake the device screen (turn screen on)",
@@ -190,7 +191,7 @@ export function registerDeviceTools(server: McpServer) {
     }
   );
 
-  server.registerTool(
+  registerEnvTool(server, 
     "screen_off",
     {
       description: "Turn the device screen off",
@@ -224,7 +225,7 @@ export function registerDeviceTools(server: McpServer) {
     }
   );
 
-  server.registerTool(
+  registerEnvTool(server, 
     "connect_wifi",
     {
       description: "Enable WiFi ADB and connect to the device wirelessly. Returns the connection address.",
@@ -276,7 +277,7 @@ export function registerDeviceTools(server: McpServer) {
     }
   );
 
-  server.registerTool(
+  registerEnvTool(server, 
     "disconnect_wifi",
     {
       description: "Disconnect from a wireless ADB device",
@@ -303,7 +304,7 @@ export function registerDeviceTools(server: McpServer) {
     }
   );
 
-  server.registerTool(
+  registerEnvTool(server, 
     "rotate_device",
     {
       description: "Rotate the device screen (requires active scrcpy session)",
@@ -338,7 +339,7 @@ export function registerDeviceTools(server: McpServer) {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "expand_notifications",
     {
       description: "Expand the notification panel (requires active scrcpy session)",
@@ -373,7 +374,7 @@ export function registerDeviceTools(server: McpServer) {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "expand_settings",
     {
       description: "Expand the quick settings panel (requires active scrcpy session)",
@@ -408,7 +409,7 @@ export function registerDeviceTools(server: McpServer) {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "collapse_panels",
     {
       description: "Collapse all open panels (notification, settings) (requires active scrcpy session)",

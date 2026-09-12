@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import { execAdbShell, resolveSerial } from "../core/adb.js"
 import { hasActiveSession } from "../core/scrcpy.js"
@@ -154,7 +155,7 @@ async function tapWithFallback(serial: string, x: number, y: number): Promise<vo
 }
 
 export function registerUiTools(server: McpServer): void {
-  server.registerTool(
+  registerEnvTool(server, 
     "ui_dump",
     {
       description: "Dump the full UI hierarchy of the current screen as XML.",
@@ -191,7 +192,7 @@ export function registerUiTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "ui_find_element",
     {
       description: "Find UI elements on screen by text, resource ID, class name, or content description. Returns matching elements with their tap coordinates.",
@@ -258,7 +259,7 @@ export function registerUiTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "ui_tap_element",
     {
       description: "Find a UI element by text, resource ID, class name, or content description, and immediately tap it. Smartly finds the nearest input field when targeting a label.",
@@ -331,7 +332,7 @@ export function registerUiTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "ui_get_state",
     {
       description: "Dump the UI and return a clean Markdown-like tree of visible and clickable elements with viewport coordinates. NOTE: WebView elements may report identical y-coordinates when scrolled; use scroll_to_element first to bring target fields into view.",
@@ -387,7 +388,7 @@ export function registerUiTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "ui_wait_for_element",
     {
       description: "Wait for a UI element to appear on screen. Polls the UI until the element matches criteria or timeout is reached.",
@@ -448,7 +449,7 @@ export function registerUiTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "ui_smart_fill",
     {
       description: "Find a UI element, tap it, inject text, and optionally press ENTER. Smartly finds the nearest input field when targeting a label.",
@@ -526,7 +527,7 @@ export function registerUiTools(server: McpServer): void {
   )
 
   // --- NEW: wait tool ---
-  server.registerTool(
+  registerEnvTool(server, 
     "wait",
     {
       description: "Wait for a specified number of milliseconds. Use between actions to wait for animations, page loads, or network responses.",
@@ -553,7 +554,7 @@ export function registerUiTools(server: McpServer): void {
   )
 
   // --- NEW: scroll_to_element tool ---
-  server.registerTool(
+  registerEnvTool(server, 
     "scroll_to_element",
     {
       description: "Scroll the page to bring a specific UI element into view. Tries to find the element by text, then swipes up/down until it becomes visible or timeout is reached.",
@@ -611,7 +612,7 @@ export function registerUiTools(server: McpServer): void {
   )
 
   // --- NEW: form_fill tool ---
-  server.registerTool(
+  registerEnvTool(server, 
     "form_fill",
     {
       description: "Fill a multi-field form. Provide an array of {label, value} pairs. For each pair, finds the nearest input field to the label text, taps it, and types the value. Handles checkboxes and dropdowns by label matching.",

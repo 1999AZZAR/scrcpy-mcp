@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import { execAdbShell, resolveSerial, getDeviceProperty } from "../core/adb.js"
 import {
@@ -296,7 +297,7 @@ function actionError(message: string, extra: Record<string, unknown> = {}) {
 }
 
 export function registerInputTools(server: McpServer): void {
-  server.registerTool(
+  registerEnvTool(server, 
     "tap",
     {
       description: "Tap at the specified screen coordinates",
@@ -337,7 +338,7 @@ export function registerInputTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "swipe",
     {
       description: "Perform a swipe gesture from one point to another",
@@ -381,7 +382,7 @@ export function registerInputTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "long_press",
     {
       description: "Perform a long press at the specified coordinates",
@@ -423,7 +424,7 @@ export function registerInputTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "drag_drop",
     {
       description: "Perform a drag and drop gesture from one point to another. Uses input draganddrop on Android 8.0+ (API 26), falls back to swipe on older versions.",
@@ -476,7 +477,7 @@ export function registerInputTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "input_text",
     {
       description: "Type text into the input field. Reports device context (screen, app, session). When submit=true, auto-detects and taps the send button. Optionally target a specific input field by text label, resource ID, or content description instead of auto-focus.",
@@ -611,7 +612,7 @@ export function registerInputTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "key_event",
     {
       description: "Send a key event to the device. Supports keycodes like HOME, BACK, ENTER, VOLUME_UP, etc.",
@@ -666,7 +667,7 @@ export function registerInputTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "scroll",
     {
       description: "Scroll at the specified position. dy=negative scrolls UP (reveals content above), dy=positive scrolls DOWN (reveals content below). Use large values (e.g. -400, 500) for meaningful scroll distance.",

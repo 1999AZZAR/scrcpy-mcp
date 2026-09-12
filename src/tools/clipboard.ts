@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { registerEnvTool } from "../envelope.js";
 import { z } from "zod"
 import { execAdbShell, resolveSerial, getDeviceProperty } from "../core/adb.js"
 import {
@@ -94,7 +95,7 @@ async function setClipboardViaAdb(serial: string, text: string): Promise<boolean
 }
 
 export function registerClipboardTools(server: McpServer): void {
-  server.registerTool(
+  registerEnvTool(server, 
     "clipboard_get",
     {
       description: "Get the current clipboard content from the device. Uses scrcpy GET_CLIPBOARD when a session is active (works on Android 10+), falls back to ADB clipboard commands.",
@@ -162,7 +163,7 @@ export function registerClipboardTools(server: McpServer): void {
     }
   )
 
-  server.registerTool(
+  registerEnvTool(server, 
     "clipboard_set",
     {
       description: "Set the clipboard content on the device. Uses scrcpy SET_CLIPBOARD when a session is active (with optional paste flag), falls back to ADB clipboard commands.",
