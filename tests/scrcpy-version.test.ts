@@ -7,7 +7,7 @@ import {
   detectScrcpyVersionInfo,
   detectScrcpyVersion,
   __resetScrcpyVersionCacheForTests,
-} from "../src/utils/scrcpy.js"
+} from "../src/core/scrcpy.js"
 import {
   DEVICE_META_SIZE,
   VIDEO_WIDTH_OFFSET,
@@ -16,7 +16,7 @@ import {
   V4_VIDEO_WIDTH_OFFSET,
   V4_VIDEO_HEIGHT_OFFSET,
   SCRCPY_SERVER_VERSION,
-} from "../src/utils/constants.js"
+} from "../src/core/constants.js"
 
 vi.mock("child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("child_process")>()
@@ -37,22 +37,25 @@ describe("buildServerArgs", () => {
 
   it("requests codec meta on scrcpy 3.x", () => {
     const args = buildServerArgs("SERIAL", 0x1234, "3.3.4")
-    expect(args).toContain("send_codec_meta=true")
-    expect(args).not.toContain("send_stream_meta=true")
+    const shellCommand = args.at(-1) ?? ""
+    expect(shellCommand).toContain("send_codec_meta=true")
+    expect(shellCommand).not.toContain("send_stream_meta=true")
   })
 
   it("requests stream meta on scrcpy 4.x (send_codec_meta was renamed)", () => {
     const args = buildServerArgs("SERIAL", 0x1234, "4.0")
-    expect(args).toContain("send_stream_meta=true")
-    expect(args).not.toContain("send_codec_meta=true")
+    const shellCommand = args.at(-1) ?? ""
+    expect(shellCommand).toContain("send_stream_meta=true")
+    expect(shellCommand).not.toContain("send_codec_meta=true")
   })
 
   it.each(["3.3.4", "4.0", "4.1.2"])(
     "pins the shared wire-format options explicitly for version %s",
     (version) => {
       const args = buildServerArgs("SERIAL", 0x1234, version)
+      const shellCommand = args.at(-1) ?? ""
       for (const arg of commonWireFormatArgs) {
-        expect(args).toContain(arg)
+        expect(shellCommand).toContain(arg)
       }
     }
   )
@@ -64,9 +67,10 @@ describe("buildServerArgs", () => {
         maxFps: 15,
         videoBitRate: 4000000,
       })
-      expect(args).toContain("max_size=800")
-      expect(args).toContain("max_fps=15")
-      expect(args).toContain("video_bit_rate=4000000")
+      const shellCommand = args.at(-1) ?? ""
+      expect(shellCommand).toContain("max_size=800")
+      expect(shellCommand).toContain("max_fps=15")
+      expect(shellCommand).toContain("video_bit_rate=4000000")
     }
   })
 })

@@ -12,7 +12,7 @@ import {
   serializeSetClipboard,
   serializeRotateDevice,
   serializeStartApp,
-} from "../src/utils/scrcpy.js"
+} from "../src/core/scrcpy.js"
 import {
   CONTROL_MSG_TYPE_INJECT_KEYCODE as MSG_INJECT_KEYCODE,
   CONTROL_MSG_TYPE_INJECT_TEXT as MSG_INJECT_TEXT,
@@ -26,7 +26,7 @@ import {
   CONTROL_MSG_TYPE_SET_DISPLAY_POWER as MSG_SET_DISPLAY_POWER,
   CONTROL_MSG_TYPE_ROTATE_DEVICE as MSG_ROTATE_DEVICE,
   CONTROL_MSG_TYPE_START_APP as MSG_START_APP,
-} from "../src/utils/constants.js"
+} from "../src/core/constants.js"
 
 describe("serializeInjectKeycode", () => {
   it("produces a 14-byte buffer", () => {
