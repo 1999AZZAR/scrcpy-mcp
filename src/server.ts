@@ -16,7 +16,7 @@ import { registerVideoTools } from "./tools/video.js"
 function createServer() {
   const server = new McpServer({
     name: "scrcpy-mcp",
-    version: process.env.npm_package_version ?? "0.0.0",
+    version: process.env.npm_package_version ?? "3.0.0",
   })
 
   registerSessionTools(server)
